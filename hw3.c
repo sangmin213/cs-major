@@ -66,6 +66,29 @@ typedef struct{
     int front, rear;
 }Queue;
 
+
+void InitNode(Node* node);
+Node* Minimum(Node* x);
+Node* Successor(Node* x);
+void LeftRotate(RBT* T, Node* x);
+void RightRotate(RBT* T, Node* x);
+void RB_Insert_Fixup(RBT* T, Node* z);
+void RB_Insert(RBT* T, Node* z);
+int Input(Database* DB);
+void RB_Delete_Fixup(RBT* T,Node* x);
+Node* RB_Delete(RBT* T,Node* z);
+void Remove(Database* DB);
+void PrintModified(Database* DB, Node* student, Information* deleted); //그때그때 변경 결과 Print 함수
+void Prefix(RBT* T, Node* node);
+int max(int a, int b);
+int RB_Height(RBT* T, Node* node);
+int RB_nodes(RBT* T, Node* node);
+void RB_Print(RBT* T);
+void Print_BST(RBT* T);
+Node* search(RBT* T,int k);
+bool checkExist(int duplicate[], int key, Node* node, RBT* rbt);
+
+
 void InitQueue (Queue *pqueue)
 {
     pqueue->front=pqueue->rear=0;
@@ -112,7 +135,8 @@ void PrintModified(Database* DB, Node* student, Information* deleted); //그때�
 
 //<red black tree implementing functions>
 //init student node of rbt
-void InitNode(Node* node){
+void InitNode(Node* node)
+{
     node->parent=NULL;
     node->left=NULL;
     node->right=NULL;
@@ -376,7 +400,7 @@ int Input(Database* DB)
                 if(temp->credit + credit > 21){
                     printf("Over 21 credits. You cannot add more.\n"); //넘으면 에러 메세지 & 종료
                     free(information); free(trans); free(student);
-                    return;
+                    return 0;
                 }
                 //안 넘으면 더하기(추가)
                 temp->credit+=credit;
