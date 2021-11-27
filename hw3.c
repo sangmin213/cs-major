@@ -15,6 +15,13 @@ Node가 앞서 specification에서 정의한 Student 구조체의
 
 
 //student database
+typedef struct _trans{
+    struct _trans* next;
+    int year; //년도
+    int credit; // 수강 학점
+    char semester; //학기
+}Transcript;
+
 typedef struct _info{
     struct _info* next;
     char Semester;
@@ -34,6 +41,7 @@ typedef struct _node{
     int Credit_hour; //whole credit of this student
     float GPA;
     Information* info; //each course
+    Transcript* transcript;
     char color;
     char nil;
 }Node; //Student
@@ -100,6 +108,8 @@ void QueuePop(Queue *pqueue)
 }
 
 
+void PrintModified(Database* DB, Node* student, Information* deleted); //그때그때 변경 결과 Print 함수
+
 //<red black tree implementing functions>
 //init student node of rbt
 void InitNode(Node* node){
@@ -110,6 +120,7 @@ void InitNode(Node* node){
     node->Credit_hour=0;
     node->GPA=0;
     node->info=NULL;
+    node->transcript=NULL;
     node->color=black;
     node->nil=0; // 1이면 nil
 }
@@ -265,6 +276,10 @@ int Input(Database* DB)
     Node* node; // student가 tree 안에 있는지 확인용
     Information* information=(Information*)malloc(sizeof(Information));
     Information* tmp; // student의 마지막 information 찾는 용도
+    Information* tmp2=NULL; // student의 마지막 information 찾는 용도
+    Transcript* trans=(Transcript*)malloc(sizeof(Transcript));
+    Transcript* temp; // student의 알맞은 transcript 찾는 용도
+    Transcript* prev; // student의 알맞은 transcript 찾는 용도
 
     //입력 과정
     printf("Student id(2022123456): ");
@@ -337,11 +352,16 @@ int Input(Database* DB)
     strcpy(information->Grade,grade);
     information->Credit=credit;
     information->GradeScore=grade_score;
-
+    //transcript 생성
+    trans->next=NULL;
+    trans->year=year;
+    trans->credit=credit;
+    trans->semester=semester;
 
     //student 있는지 search
     if(DB->head->nil==(node=search(DB->head,studentID))){ //없다면
         student->info=information; //info 의 첫 원소로 이번 information 넣음
+        student->transcript=trans; //첫 transcript 추가
         student->Credit_hour+=credit;
         student->GPA=grade_score;
         RB_Insert(DB->head,student);
@@ -349,10 +369,46 @@ int Input(Database* DB)
         DB->GPA=(DB->GPA*DB->Student_num+grade_score)/(++DB->Student_num); //gpa, student num update
     }
     else{ //있다면
+        //transcript를 확인하여 21학점 안 넘는지 확인
+        temp=node->transcript;
+        while(temp!=NULL){
+            if(temp->year==year && temp->semester==semester){
+                if(temp->credit + credit > 21){
+                    printf("Over 21 credits. You cannot add more.\n"); //넘으면 에러 메세지 & 종료
+                    free(information); free(trans); free(student);
+                    return;
+                }
+                //안 넘으면 더하기(추가)
+                temp->credit+=credit;
+                break;
+            }
+            prev=temp;
+            temp=temp->next;
+        }
+        //해당 년도 해당 학기 없었다면 추가
+        if(temp==NULL)
+            prev->next=trans;
+        
+        // student의 info에 이번 information 년도/학기 순서에 맞추어 추가
         tmp=node->info;
-        while(tmp->next!=NULL)
-            tmp=tmp->next;
-        tmp->next=information; // student의 info에 이번 information 추가
+        while(tmp->next!=NULL) {
+            //수강 년도가 더 작다면
+            if(tmp->Year < year){
+                //학기도 더 앞이라면 (S > F in ASCII code)
+                if(tmp->Semester > semester)
+                    tmp2=tmp;
+                    tmp=tmp->next;
+            }
+        }
+        if(tmp2==NULL){ //맨 앞에 추가하는 경우
+            information->next=tmp;
+            node->info=information;
+        }
+        else{
+            information->next=tmp->next;
+            tmp->next=information;
+        }
+        
         //student 및 전체 학생 정보 update
         float gpa;
         gpa = DB->GPA * DB->Student_num - node->GPA; // DB gpa update 용
@@ -360,8 +416,9 @@ int Input(Database* DB)
         node->Credit_hour+=credit; //this student credit hour update
         DB->GPA = (gpa + node->GPA)/DB->Student_num; //whole gpa update 
     }
-    
-    Print(DB,student,NULL); //input result 출력
+    free(student); free(trans); // 사용 안한 메모리 해제
+    printf("\n[New Insertion]\n");
+    PrintModified(DB,student,NULL); //input result 출력
     return 1; //정상적으로 입력했을 시.
 }
 
@@ -469,7 +526,8 @@ void Remove(Database* DB)
     float grade_score; // The student's course's grade
 
     Node* node; // 해당 student
-    Information* tmp1,*tmp2; // student의 마지막 information 찾는 용도
+    Information* tmp1,*tmp2=NULL; // student의 마지막 information 찾는 용도
+    Transcript* temp1, *temp2;
 
     //삭제할 대상 입력 과정
     printf("Student id(2022123456): ");
@@ -491,13 +549,19 @@ void Remove(Database* DB)
     if(strcmp(course,"ALL")==0){
         grade_score=node->GPA;
         DB->GPA=(DB->GPA*DB->Student_num-grade_score)/(--DB->Student_num); //출력을 위해 먼저 전체 학생 정보 계산하여 update
-        Print(DB,node,NULL); //삭제할 학생 정보 및 전체 정보 출력
+        PrintModified(DB,node,NULL); //삭제할 학생 정보 및 전체 정보 출력
         //삭제 진행
         tmp1=node->info;
         while(tmp1!=NULL){
             tmp2=tmp1;
             tmp1=tmp1->next;
             free(tmp2);
+        }
+        temp1=node->transcript;
+        while(temp1!=NULL){
+            temp2=temp1;
+            temp1=temp1->next;
+            free(temp2);
         }
         RB_Delete(DB->head,node);
     }
@@ -513,16 +577,37 @@ void Remove(Database* DB)
             return;
         }
         else{
-            tmp2->next=tmp1->next->next;
+            if(tmp2==NULL) // info의 첫 번째 노드를 삭제한 경우.
+                node->info=tmp1->next;
+            else
+                tmp2->next=tmp1->next->next;
             grade_score=tmp1->GradeScore;
             credit=tmp1->Credit;
+            //student transcript update
+            temp1=node->transcript;
+            while(temp1!=NULL){
+                if(temp1->year==tmp1->Year && temp1->semester==tmp1->Semester){
+                    temp1->credit-= tmp1->Credit;
+                    if(temp1->credit==0){
+                        //credit==0이라서 삭제해야 할 temp1이 trans의 첫번째 노드 인 경우
+                        if(temp2==NULL)
+                            node->transcript->next=temp1->next;
+                        else //아니라면 연결 고리 update
+                            temp2->next=temp1->next;
+                        free(temp1);
+                    }
+                    break;
+                }
+                temp2=temp1;
+                temp1=temp1->next;
+            }
             //student gpa & credit hour update
             node->GPA=(gpa_score * node->Credit_hour - grade_score * credit) / (node->Credit_hour - credit);
             node->Credit_hour-=credit;
             //databse gpa & # of students update
             DB->GPA=(DB->GPA * DB->Student_num - gpa_score + node->GPA) / DB->Student_num;
             //print deleted course and total student information
-            Print(DB,node,tmp1);
+            PrintModified(DB,node,tmp1);
             free(tmp1); // delete the course
         }
     }
@@ -531,7 +616,7 @@ void Remove(Database* DB)
 }
 
 
-void Print(Database* DB, Node* student, Information* deleted)
+void PrintModified(Database* DB, Node* student, Information* deleted)
 {
     //error case
     if(student==NULL || student==DB->head->nil){
@@ -549,11 +634,11 @@ void Print(Database* DB, Node* student, Information* deleted)
     2. insert인 경우
     3. deletion all 인 경우
     */
-    if(deleted!=NULL){
+    if(deleted==NULL){
         cur=student->info;
         prev=cur;
         while(cur!=NULL){
-            if(strcmp(prev->Semester,cur->Semester)!=0 || prev->Year!=cur->Year) // 학기/년도 별로 구분
+            if(prev->Semester!=cur->Semester || prev->Year!=cur->Year) // 학기/년도 별로 구분
                 printf("\n");
             printf("%d %c %s %s %d\n",cur->Year, cur->Semester, cur->Course, cur->Grade, cur->Credit);
             prev=cur;
@@ -566,7 +651,7 @@ void Print(Database* DB, Node* student, Information* deleted)
         printf("[Total Students: %d, GPA: %.1f]\n",DB->Student_num, DB->GPA);
     }
 
-    //deletion 특정인 경우: condition==2 and deleted=something;
+    //deletion 특정인 경우: deleted=something;
     else{
         cur=deleted;
         printf("%d %c %s %s %d\n",cur->Year, cur->Semester, cur->Course, cur->Grade, cur->Credit);
@@ -578,6 +663,67 @@ void Print(Database* DB, Node* student, Information* deleted)
         printf("[GPA: %.1f, Credit hour: %d]\n",student->GPA, remain_credit);
         printf("[Total Students: %d, GPA: %.1f]\n",DB->Student_num, DB->GPA);
     }
+
+    RB_Print(DB->head);
+}
+
+
+void Prefix(RBT* T, Node* node)
+{
+    if(node==T->nil)
+        return;
+    Prefix(T,node->left);
+    printf("%d ",node->key);
+    Prefix(T,node->right);
+}
+
+
+int max(int a, int b)
+{
+    if(a>b)
+        return a;
+    return b;
+}
+
+
+int RB_Height(RBT* T, Node* node)
+{
+    int r=0,l=0;
+    if(node->left!=T->nil)
+        l=RB_Height(T,node->left);
+    if(node->right!=T->nil)
+        r=RB_Height(T,node->right);
+
+    return 1+max(r,l);
+}
+
+
+int RB_nodes(RBT* T, Node* node)
+{
+    int r=0,l=0;
+    if(node->left!=T->nil)
+        l=RB_nodes(T,node->left);
+    if(node->right!=T->nil)
+        r=RB_nodes(T,node->right);
+
+    return 1+r+l;
+}
+
+
+void RB_Print(RBT* T)
+{
+    int height;
+    int nodes;
+    if(T->root==T->nil){
+        printf("There is no student yet.\n");
+        return;
+    }
+    height=RB_Height(T,T->root);
+    nodes=RB_nodes(T,T->root);
+    printf("[DATABASE with red black tree]\n");
+    printf("Total nodes: %d, Height: %d\n",nodes,height);
+    Prefix(T,T->root);
+    printf("\n");
 }
 
 
