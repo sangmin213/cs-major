@@ -60,13 +60,6 @@ typedef struct{
 }Database; //
 
 
-//Use Queue for print rbt function 
-typedef struct{
-    Node* items[MAX_LEN];
-    int front, rear;
-}Queue;
-
-
 void InitNode(Node* node);
 Node* Minimum(Node* x);
 Node* Successor(Node* x);
@@ -86,52 +79,8 @@ int RB_nodes(RBT* T, Node* node);
 void RB_Print(RBT* T);
 void Print_BST(RBT* T);
 Node* search(RBT* T,int k);
-bool checkExist(int duplicate[], int key, Node* node, RBT* rbt);
+void CheckStudent(Database* DB);
 
-
-void InitQueue (Queue *pqueue)
-{
-    pqueue->front=pqueue->rear=0;
-}
-
-bool QueueIsFull(Queue *pqueue)
-{
-    return pqueue->front==(pqueue->rear+1) % MAX_LEN;
-}
-
-bool QueueIsEmpty(Queue *pqueue)
-{
-    return pqueue->front==pqueue->rear;
-}
-
-Node* QueuePeek(Queue *pqueue)
-{
-    if(!QueueIsEmpty(pqueue))
-        return pqueue->items[pqueue->front];
-    else
-        exit(1);
-}
-
-void QueuePush(Queue *pqueue,Node* item)
-{
-    if(!QueueIsFull(pqueue)){        
-        pqueue->items[pqueue->rear]=item;
-        pqueue->rear=(pqueue->rear+1)%MAX_LEN;
-    }
-    else
-        exit(1);
-}
-
-void QueuePop(Queue *pqueue)
-{
-    if(!QueueIsEmpty(pqueue))
-        pqueue->front=(pqueue->front+1)%MAX_LEN;
-    else
-        exit(1);
-}
-
-
-void PrintModified(Database* DB, Node* student, Information* deleted); //그때그때 변경 결과 Print 함수
 
 //<red black tree implementing functions>
 //init student node of rbt
@@ -284,7 +233,6 @@ void RB_Insert(RBT* T, Node* z)
 
 //Head를 통한 input 입력
 //잘못 입력 시 에러 출력하고 return 0
-Node* search(RBT* T,int k); //밑에 있는 함수 미리 땡겨옴. 코딩 순서 고려
 int Input(Database* DB)
 {
     int studentID;
@@ -313,6 +261,11 @@ int Input(Database* DB)
     printf("Semester(S or F): ");
     scanf("%c",&semester);
     getchar();
+    //error case
+    if(semester!=70 && semester!=83){
+        printf("\nSemester should be S or F !!! \n");
+        return 0;
+    }
 
     printf("Year(2021): ");
     scanf("%d",&year);
@@ -325,10 +278,28 @@ int Input(Database* DB)
     printf("Grade(A+,A,B+,...,D,F): ");
     fgets(grade,MAX_LEN,stdin);
     grade[strlen(grade)-1]='\0';
-    
+    //error case
+    if(grade[0]<65 || grade[0]>70 || grade[10]=='E'){
+        printf("\nGrade should be A+,A,B+,B,C+,C,D+,D,F !!! \n");
+        return 0;
+    }
+    else if(grade[1]!='\0' && grade[1]!='+'){
+        printf("\nGrade should be A+,A,B+,B,C+,C,D+,D,F !!! \n");
+        return 0;
+    }
+    else if(strlen(grade)>2){
+        printf("\nGrade should be A+,A,B+,B,C+,C,D+,D,F !!! \n");
+        return 0;
+    }
+
     printf("Credit(3/2/1): ");
     scanf("%d",&credit);
     getchar();
+    //error case
+    if(credit<1 || credit>3){
+        printf("\nCredit should be 1~3 !!!\n");
+        return 0;
+    }
     
     //학점 계산
     if(strlen(grade)==1){
@@ -399,7 +370,7 @@ int Input(Database* DB)
             if(temp->year==year && temp->semester==semester){
                 if(temp->credit + credit > 21){
                     printf("Over 21 credits. You cannot add more.\n"); //넘으면 에러 메세지 & 종료
-                    free(information); free(trans); free(student);
+                    //free(information); free(trans); free(student);
                     return 0;
                 }
                 //안 넘으면 더하기(추가)
@@ -415,13 +386,25 @@ int Input(Database* DB)
         
         // student의 info에 이번 information 년도/학기 순서에 맞추어 추가
         tmp=node->info;
-        while(tmp->next!=NULL) {
-            //수강 년도가 더 작다면
-            if(tmp->Year < year){
-                //학기도 더 앞이라면 (S > F in ASCII code)
-                if(tmp->Semester > semester)
+        while(tmp!=NULL) {
+            //현재 확인하고 있는 노드의 수강 년도가 이번에 추가할 수업의 년도 보다 더 크다면 멈추고 그 자리에 추가
+            if(tmp->Year > year){
+                break;
+            }
+            //현재 확인하고 있는 노드의 수강 년도가 이번에 추가할 수업의 년도 보다 더 작다면 멈추고 그냥 바로 다음으로 넘어가기
+            else if(tmp->Year<year){
+                tmp2=tmp;
+                tmp=tmp->next;
+            }
+            else{
+                //동일한 년도 일 때, 학기가 더 앞선 학기라 S > F 라면, 바로 다음으로 넘어가기
+                if(tmp->Semester > semester){
                     tmp2=tmp;
                     tmp=tmp->next;
+                }
+                //그렇지 않다면 그 자리에 추가
+                else
+                    break;
             }
         }
         if(tmp2==NULL){ //맨 앞에 추가하는 경우
@@ -429,8 +412,8 @@ int Input(Database* DB)
             node->info=information;
         }
         else{
-            information->next=tmp->next;
-            tmp->next=information;
+            information->next=tmp2->next;
+            tmp2->next=information;
         }
         
         //student 및 전체 학생 정보 update
@@ -440,12 +423,12 @@ int Input(Database* DB)
         node->Credit_hour+=credit; //this student credit hour update
         DB->GPA = (gpa + node->GPA)/DB->Student_num; //whole gpa update 
     }
-    free(student); free(trans); // 사용 안한 메모리 해제
+    //free(student); free(trans); // 사용 안한 메모리 해제
     printf("\n[New Insertion]\n");
     PrintModified(DB,student,NULL); //input result 출력
+    RB_Print(DB->head);
     return 1; //정상적으로 입력했을 시.
 }
-
 
 
 void RB_Delete_Fixup(RBT* T,Node* x)
@@ -531,9 +514,14 @@ Node* RB_Delete(RBT* T,Node* z)
     else
         y->parent->right=x;
 
-    if(y!=z)
+    if(y!=z){
         z->key=y->key;
-
+        z->Credit_hour=y->Credit_hour;
+        z->GPA=y->GPA;
+        z->info=y->info;
+        z->transcript=y->transcript;
+    }
+        
     if(y->color==black)
         RB_Delete_Fixup(T,x);
     return y;
@@ -588,6 +576,7 @@ void Remove(Database* DB)
             free(temp2);
         }
         RB_Delete(DB->head,node);
+        RB_Print(DB->head);
     }
     else{
         gpa_score=node->GPA;
@@ -632,6 +621,7 @@ void Remove(Database* DB)
             DB->GPA=(DB->GPA * DB->Student_num - gpa_score + node->GPA) / DB->Student_num;
             //print deleted course and total student information
             PrintModified(DB,node,tmp1);
+            RB_Print(DB->head);
             free(tmp1); // delete the course
         }
     }
@@ -643,7 +633,7 @@ void Remove(Database* DB)
 void PrintModified(Database* DB, Node* student, Information* deleted)
 {
     //error case
-    if(student==NULL || student==DB->head->nil){
+    if(student==NULL){
         printf("There is no such student\n");
         return;
     }
@@ -672,7 +662,7 @@ void PrintModified(Database* DB, Node* student, Information* deleted)
         else
             remain_credit = 0;
         printf("[GPA: %.1f, Credit hour: %d]\n",student->GPA, remain_credit);
-        printf("[Total Students: %d, GPA: %.1f]\n",DB->Student_num, DB->GPA);
+        printf("[Total Students: %d, GPA: %.3f]\n",DB->Student_num, DB->GPA);
     }
 
     //deletion 특정인 경우: deleted=something;
@@ -685,10 +675,10 @@ void PrintModified(Database* DB, Node* student, Information* deleted)
         else
             remain_credit = 0;
         printf("[GPA: %.1f, Credit hour: %d]\n",student->GPA, remain_credit);
-        printf("[Total Students: %d, GPA: %.1f]\n",DB->Student_num, DB->GPA);
+        printf("[Total Students: %d, GPA: %.3f]\n",DB->Student_num, DB->GPA);
     }
 
-    RB_Print(DB->head);
+    //RB_Print(DB->head);
 }
 
 
@@ -751,80 +741,6 @@ void RB_Print(RBT* T)
 }
 
 
-void Print_BST(RBT* T)
-{ 
-	Queue queue;
-    Node* node=T->root;
-    int jmp[6]={1,3,7,15,31,63};
-    int gap[63]={64,32,60,16,28,28,28,8,12,12,12,12,12,12,12,4,4,5,5,5,5,5,5,5,5,5,5,5,5,5,5,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
-    int val[63];
-    int col[63];
-    int idx=0, level=1, jmpidx=0;
-	if(node==T->nil) 
-		return;
-	InitQueue(&queue);
-	QueuePush(&queue, node);
-    //printf("hi\n");
-	while(!QueueIsEmpty(&queue)){
-        node = QueuePeek(&queue);
-		QueuePop(&queue);
-		val[idx]=node->key;
-        col[idx++]=node->color;
-		if(node->left==NULL || node->left==T->nil)
-			QueuePush(&queue, T->nil);
-        else
-            QueuePush(&queue, node->left);
-		if(node->right==NULL || node->right==T->nil)
-			QueuePush(&queue, T->nil);
-        else
-            QueuePush(&queue, node->right);
-        if(idx==63)
-            break;
-	}
-    for(int i=0;i<63;i++){
-        if(jmp[jmpidx]==i){
-            printf("\n");
-            jmpidx++;
-        }
-        if(i==0){
-            for(int j=0;j<gap[i]-1;j++)
-                printf(" ");
-            printf("%2d",val[i]);
-            if(col[i]==red) 
-                printf("r");
-            else
-                printf("b");
-        }
-        else if(i%2==1){
-            for(int j=0;j<gap[i]-1;j++)
-                printf(" ");    
-            if(val[i]==-1)
-                printf("(   ");
-            else{
-                printf("(%2d",val[i]);
-                if(col[i]==red)
-                    printf("r");
-                else
-                    printf("b");
-            }
-        }
-        else if(i%2==0){
-            for(int j=0;j<gap[i]-1;j++)
-                printf(" ");
-            if(val[i]==-1)
-                printf("   )");
-            else{
-                printf("%2d",val[i]);
-                if(col[i]==red) 
-                    printf("r)");
-                else
-                    printf("b)");
-            }
-        }
-    }
-}
-
-
 Node* search(RBT* T,int k)
 {
     Node* x=T->root;
@@ -840,14 +756,276 @@ Node* search(RBT* T,int k)
 }
 
 
-bool checkExist(int duplicate[], int key, Node* node, RBT* rbt)
+void CheckStudent(Database* DB)
 {
-    if(duplicate[key]==0){
-        node->key=key;
-        RB_Insert(rbt,node);
-        return true;
+    int key;
+    Node* node;
+    printf("Student ID: ");
+    scanf("%d",&key);
+    getchar();
+
+    node=search(DB->head,key);
+    PrintModified(DB,node,NULL);    
+}
+
+
+void Interaction(Database* DB)
+{
+    int what;
+    while(1){
+        printf("\nWhat do you want to do?\n");
+        printf("1: Insert\n2: Delete\n3: Check All\n4: Check a student\n0: Quit\nChoice: ");
+        scanf("%d",&what);
+        getchar();
+
+        if(what==0)
+            exit(1);
+        else if(what==1)
+            Input(DB);
+        else if(what==2)
+            Remove(DB);
+        else if(what==3)
+            RB_Print(DB->head);
+        else
+            CheckStudent(DB);
     }
-    return false;
+}
+
+
+int TestcaseInput(Database* DB,int studentID, char semester, int year, char* course, char* grade, int credit)
+{
+    float grade_score;
+
+    Node* student=(Node*)malloc(sizeof(Node));
+    Node* node; // student가 tree 안에 있는지 확인용
+    Information* information=(Information*)malloc(sizeof(Information));
+    Information* tmp; // student의 마지막 information 찾는 용도
+    Information* tmp2=NULL; // student의 마지막 information 찾는 용도
+    Transcript* trans=(Transcript*)malloc(sizeof(Transcript));
+    Transcript* temp; // student의 알맞은 transcript 찾는 용도
+    Transcript* prev; // student의 알맞은 transcript 찾는 용도
+
+    //학점 계산
+    if(strlen(grade)==1){
+        switch(grade[0]){
+            case 'A':
+                grade_score=4;
+                break;
+            case 'B':
+                grade_score=3;
+                break;
+            case 'C':
+                grade_score=2;
+                break;
+            case 'D':
+                grade_score=1;
+                break;
+            case 'F':
+                grade_score=0;            
+        }
+    }
+    else{
+        switch(grade[0]){
+            case 'A':
+                grade_score=4.5;
+                break;
+            case 'B':
+                grade_score=3.5;
+                break;
+            case 'C':
+                grade_score=2.5;
+                break;
+            case 'D':
+                grade_score=1.5;
+        }
+    }
+
+    //Node 생성
+    InitNode(student);
+    student->key=studentID;
+    //information 생성
+    information->next=NULL;
+    information->Semester=semester;
+    information->Year=year;
+    strcpy(information->Course,course);
+    strcpy(information->Grade,grade);
+    information->Credit=credit;
+    information->GradeScore=grade_score;
+    //transcript 생성
+    trans->next=NULL;
+    trans->year=year;
+    trans->credit=credit;
+    trans->semester=semester;
+
+    node=search(DB->head,studentID);
+
+    //student 있는지 search
+    if(DB->head->nil==node){ //없다면
+        student->info=information; //info 의 첫 원소로 이번 information 넣음
+        student->transcript=trans; //첫 transcript 추가
+        student->Credit_hour+=credit;
+        student->GPA=grade_score;
+        RB_Insert(DB->head,student);
+        // 전체 학생 정보 update
+        DB->GPA=(DB->GPA*DB->Student_num+grade_score)/(++DB->Student_num); //gpa, student num update
+    }
+    else{ //있다면
+        //transcript를 확인하여 21학점 안 넘는지 확인
+        temp=node->transcript;
+        while(temp!=NULL){
+            if(temp->year==year && temp->semester==semester){
+                if(temp->credit + credit > 21){
+                    //printf("Over 21 credits. You cannot add more.\n"); //넘으면 에러 메세지 & 종료
+                    //free(information); free(trans); free(student);
+                    return 0;
+                }
+                //안 넘으면 더하기(추가)
+                temp->credit+=credit;
+                break;
+            }
+            prev=temp;
+            temp=temp->next;
+        }
+
+        //해당 년도 해당 학기 없었다면 추가
+        if(temp==NULL)
+            prev->next=trans;
+
+        // student의 info에 이번 information 년도/학기 순서에 맞추어 추가
+        tmp=node->info;
+        while(tmp!=NULL) {
+            //현재 확인하고 있는 노드의 수강 년도가 이번에 추가할 수업의 년도 보다 더 크다면 멈추고 그 자리에 추가
+            if(tmp->Year > year){
+                break;
+            }
+            //현재 확인하고 있는 노드의 수강 년도가 이번에 추가할 수업의 년도 보다 더 작다면 멈추고 그냥 바로 다음으로 넘어가기
+            else if(tmp->Year<year){
+                tmp2=tmp;
+                tmp=tmp->next;
+            }
+            else{
+                //동일한 년도 일 때, 학기가 더 앞선 학기라 S > F 라면, 바로 다음으로 넘어가기
+                if(tmp->Semester > semester){
+                    tmp2=tmp;
+                    tmp=tmp->next;
+                }
+                //그렇지 않다면 그 자리에 추가
+                else
+                    break;
+            }
+        }
+        if(tmp2==NULL){ //맨 앞에 추가하는 경우
+            information->next=tmp;
+            node->info=information;
+        }
+        else{
+            information->next=tmp2->next;
+            tmp2->next=information;
+        }
+        
+        //student 및 전체 학생 정보 update
+        float gpa;
+        gpa = DB->GPA * DB->Student_num - node->GPA; // DB gpa update 용
+        node->GPA = (node->GPA * node->Credit_hour + grade_score * credit) / (node->Credit_hour + credit); //this student gpa update
+        node->Credit_hour+=credit; //this student credit hour update
+        DB->GPA = (gpa + node->GPA)/DB->Student_num; //whole gpa update 
+    }
+    //free(student); free(trans); // 사용 안한 메모리 해제
+    //printf("\n[New Insertion]\n");
+    //PrintModified(DB,student,NULL); //input result 출력
+    return 1; //정상적으로 입력했을 시.
+}
+
+
+void TestcaseRemove(Database* DB, int studentID, char* course)
+{
+    int credit;
+
+    float gpa_score; // The student's gpa
+    float grade_score; // The student's course's grade
+
+    Node* node; // 해당 student
+    Information* tmp1,*tmp2=NULL; // student의 마지막 information 찾는 용도
+    Transcript* temp1, *temp2;
+
+
+    node=search(DB->head,studentID);
+    //해당 학생 없는 경우
+    if(node==DB->head->nil){
+        printf("There is no student whose id is %d\n",studentID);
+        return;
+    }
+    
+    //case 1 : 학생 id만 입력
+    if(strcmp(course,"ALL")==0){
+        grade_score=node->GPA;
+        DB->GPA=(DB->GPA*DB->Student_num-grade_score)/(--DB->Student_num); //출력을 위해 먼저 전체 학생 정보 계산하여 update
+        PrintModified(DB,node,NULL); //삭제할 학생 정보 및 전체 정보 출력
+        //삭제 진행
+        tmp1=node->info;
+        while(tmp1!=NULL){
+            tmp2=tmp1;
+            tmp1=tmp1->next;
+            free(tmp2);
+        }
+        temp1=node->transcript;
+        while(temp1!=NULL){
+            temp2=temp1;
+            temp1=temp1->next;
+            free(temp2);
+        }
+        RB_Delete(DB->head,node);
+        RB_Print(DB->head);
+    }
+    else{
+        gpa_score=node->GPA;
+        tmp1=node->info;
+        while(strcmp(tmp1->Course,course)!=0){
+            tmp2=tmp1;
+            tmp1=tmp1->next;
+        }
+        if(tmp1==NULL){ //해당 학생이 입력한 과목을 수강하지 않은 경우
+            printf("This student does not learn %s\n",course);
+            return;
+        }
+        else{
+            if(tmp2==NULL) // info의 첫 번째 노드를 삭제한 경우.
+                node->info=tmp1->next;
+            else
+                tmp2->next=tmp1->next->next;
+            grade_score=tmp1->GradeScore;
+            credit=tmp1->Credit;
+            //student transcript update
+            temp1=node->transcript;
+            while(temp1!=NULL){
+                if(temp1->year==tmp1->Year && temp1->semester==tmp1->Semester){
+                    temp1->credit-= tmp1->Credit;
+                    if(temp1->credit==0){
+                        //credit==0이라서 삭제해야 할 temp1이 trans의 첫번째 노드 인 경우
+                        if(temp2==NULL)
+                            node->transcript->next=temp1->next;
+                        else //아니라면 연결 고리 update
+                            temp2->next=temp1->next;
+                        free(temp1);
+                    }
+                    break;
+                }
+                temp2=temp1;
+                temp1=temp1->next;
+            }
+            //student gpa & credit hour update
+            node->GPA=(gpa_score * node->Credit_hour - grade_score * credit) / (node->Credit_hour - credit);
+            node->Credit_hour-=credit;
+            //databse gpa & # of students update
+            DB->GPA=(DB->GPA * DB->Student_num - gpa_score + node->GPA) / DB->Student_num;
+            //print deleted course and total student information
+            PrintModified(DB,node,tmp1);
+            RB_Print(DB->head);
+            free(tmp1); // delete the course
+        }
+    }
+
+    return;
 }
 
 
@@ -861,68 +1039,53 @@ int main()
     //init DB
     DB.GPA=0; DB.Student_num=0; DB.head=&rbt;
 
+    /*
     Input(&DB); printf("\n"); Input(&DB);
     printf("%d %.2f %d %s\n",rbt.root->key, rbt.root->GPA, rbt.root->info->Year, rbt.root->info->Course);
     printf("%.2f %d\n",DB.GPA,DB.Student_num);
+    */
 
+    //Test-case
+    //학번, 년도, semester, credit, 과목명, 성적
+    int ID[100];
+    int Year[100];
+    char Semester[100];
+    int Credit[100];
+    char Grade[10][10]={"A+","A","B+","B","C+","C","D+","D","F"};
+    char Course[100][10];
+    char tmp1[10];
+    char swe[10]="SWE";
+    char tmp2[10];
+    char zero[10]={0,};
+    for(int i=0;i<100;i++){
+        ID[i]=2021310121+i;
+        Year[i]=2015+i%5;
+        if(i%5==0 || i%6==0)
+            Semester[i]='S';
+        else
+            Semester[i]='F';
+        Credit[i]=i%3+1;
+        strcpy(tmp1,zero);
+        strcpy(tmp2,zero); //초기화
+        strcpy(tmp1,swe);  //초기화
+        sprintf(tmp2,"%d",2003+i); //SWE + 0000 숫자 담기
+        strcat(tmp1,tmp2); // 과목명 생성
+        strcpy(Course[i],tmp1); //저장
+    }
+
+    for(int i=0;i<100;i++){
+        for(int j=0;j<i+1;j++)
+            TestcaseInput(&DB,ID[i],Semester[j],Year[j],Course[j],Grade[j%9],Credit[j]);
+    }
+    RB_Print(&rbt);
     /*
-    Node a; Node b; Node c; Node d; Node e; Node f; Node g; Node h; Node i; Node j; 
-    Node k; Node l; Node m; Node n; Node o; Node p; Node q; Node r; Node s; Node t; 
-    Node nodes[20]; 
-    nodes[0]=a; nodes[1]=b; nodes[2]=c; nodes[3]=d; nodes[4]=e; nodes[5]=f; nodes[6]=g; nodes[7]=h; nodes[8]=i; nodes[9]=j;
-    nodes[10]=k; nodes[11]=l; nodes[12]=m; nodes[13]=n; nodes[14]=o; nodes[15]=p; nodes[16]=q; nodes[17]=r; nodes[18]=s; nodes[19]=t;
-    
-    int duplicate[60]={0,};
-    for(int i=0;i<20;i++){
-        InitNode(&nodes[i]);
-        while(1){
-            int tmp=rand()%60;
-            if(duplicate[tmp]==0){ //check duplicate
-                duplicate[tmp]=1;
-                nodes[i].key=tmp;
-                break;
-            }
-        }
+    for(int i=0;i<10;i++){
+        printf("%s ",Course[i]);
     }
-    for(int i=0;i<20;i++){
-        RB_Insert(&rbt,&nodes[i]);
-    }
-
-    Print_BST(&rbt);
-    printf("\n\n");
-
-    Node one, two, three, four, five;
-    InitNode(&one); InitNode(&two); InitNode(&three); InitNode(&four); InitNode(&five);
-    if(checkExist(duplicate,33,&one,&rbt)){
-        Print_BST(&rbt);
-        printf("\n\n");
-    }
-    if(checkExist(duplicate,12,&two,&rbt)){
-        Print_BST(&rbt);
-        printf("\n\n");
-    }
-    if(checkExist(duplicate,27,&three,&rbt)){
-        Print_BST(&rbt);
-        printf("\n\n");
-    }
-    if(checkExist(duplicate,41,&four,&rbt)){
-        Print_BST(&rbt);
-        printf("\n\n");
-    }
-    if(checkExist(duplicate,25,&five,&rbt)){
-        Print_BST(&rbt);
-        printf("\n\n");
-    }
-
-    Node* del;
-    int arr[5]={41,27,25,12,33};
-    for(int i=0;i<5;i++){
-        del=search(&rbt,arr[i]);
-        printf("Delete %d\n",del->key);
-        RB_Delete(&rbt,del);
-        Print_BST(&rbt);
-        printf("\n\n");
-    }
+    printf("\n");
+    printf("%s\n",tmp2);
+    printf("%s\n",tmp1);
     */
     
+    Interaction(&DB);
 }
